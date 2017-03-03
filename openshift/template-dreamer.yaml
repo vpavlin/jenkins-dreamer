@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: Template
+metadata:
+  name: jenkins-dreamer
+objects:
+- apiVersion: v1
+  kind: DeploymentConfig
+  metadata:
+    name: jenkins-dreamer
+  spec:
+    strategy:
+      type: Rolling
+      rollingParams:
+        updatePeriodSeconds: 1
+        intervalSeconds: 1
+        timeoutSeconds: 600
+        maxUnavailable: 25%
+        maxSurge: 25%
+      resources: {}
+    triggers:
+      - type: ConfigChange
+    replicas: 1
+    test: false
+    selector:
+      deploymentconfig: jenkins-dreamer
+    template:
+      metadata:
+        creationTimestamp: null
+        labels:
+          deploymentconfig: jenkins-dreamer
+      spec:
+        containers:
+          - name: jenkins-dreamer
+            image: vpavlin/dreamer
+            resources: {}
+            terminationMessagePath: /dev/termination-log
+            imagePullPolicy: Always
+            securityContext:
+              capabilities: {}
+              privileged: false
+            env:
+              - name: DREAMER_NAMESPACE
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.namespace
+              - name: IDLE_AFTER
+                value: "1"
+              - name: WAIT_TIME
+                value: "2"
+        restartPolicy: Always
+        terminationGracePeriodSeconds: 30
+        dnsPolicy: ClusterFirst
+        securityContext: {}
+
+
