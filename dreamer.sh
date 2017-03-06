@@ -107,7 +107,7 @@ function sleeper() {
   CURRENT_TS=$(date -u +%s)
   TS_IDLE_AFTER=$(date -u -d "$TIMESTAMP + $IDLE_AFTER" +%s)
 
-  if [ "$CURRENT_TS" -ge "$TS_IDLE_AFTER" ] && [ "${PHASE}" == "Finished" -o "${PHASE}" == "Failed" -o "${PHASE}" == "Cancelled" ]; then
+  if [ "$CURRENT_TS" -ge "$TS_IDLE_AFTER" ] && [ "${PHASE}" == "Finished" -o "${PHASE}" == "Complete" -o "${PHASE}" == "Failed" -o "${PHASE}" == "Cancelled" ]; then
     #Check current replicas
     if $DEBUG; then
       echo "curl ${CACERT} -XGET -k -H "Authorization: Bearer ${TOKEN}" ${HOST}oapi/v1/namespaces/${NAMESPACE}/deploymentconfigs/jenkins/"
@@ -155,7 +155,7 @@ while true; do
     fi
     PHASE=$(echo $RESPONSE | jq -r .items[$i].status.phase)
     TYPE=$(echo $RESPONSE | jq -r .items[$i].spec.strategy.type)
-    if [ "${PHASE}" == "Finished" -o "${PHASE}" == "Failed" -o "${PHASE}" == "Cancelled" ]; then
+    if [ "${PHASE}" == "Finished" -o "${PHASE}" == "Completed" -o "${PHASE}" == "Failed" -o "${PHASE}" == "Cancelled" ]; then
       TIMESTAMP=$(echo ${RESPONSE} | jq -r .items[$i].status.completionTimestamp)
     else
       TIMESTAMP=$(echo ${RESPONSE} | jq -r .items[$i].status.startTimestamp)
@@ -167,10 +167,12 @@ while true; do
 
   echo "Last build of $TYPE was $PHASE since $TIMESTAMP"
 
-  if [ "${PHASE}" == "New" -a "${TYPE}" == "JenkinsPipeline" ]; then
-    waker $RESPONSE
-  else
-    sleeper $TIMESTAMP $PHASE
+  if [ "${TYPE}" == "JenkinsPipeline" ]; then
+    if [ "${PHASE}" == "New" ]; then
+      waker $RESPONSE
+    else
+      sleeper $TIMESTAMP $PHASE
+    fi
   fi
   
   sleep ${WAIT}
