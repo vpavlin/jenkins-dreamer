@@ -60,9 +60,10 @@ while [ -n "$1" ]; do
         shift
         NAMESPACE=$1
         ;;
-    *) echo "Unknown parameter $1"
-       exit 1
-       ;;
+    *) 
+        echo "Unknown parameter $1"
+        exit 1
+        ;;
   esac
   shift
 done
