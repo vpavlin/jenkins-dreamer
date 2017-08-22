@@ -7,23 +7,23 @@ NAMESPACE=""
 IDLE_AFTER="30 sec"
 WAIT=1
 DEBUG=false
-[ -n "$6" ]
 
 function help() {
   echo "
 $0 is a script which watches builds and Jenkins in given OpenShift namespace
 and idles/wakes Jenkins based on running builds.
 
--h                Print help
--H|--host         Openshift host URI
--t|--token        OpenShift token for auth
--n|--namespace    OpenShift namespace to operate in
---idle-after      Time to wait between finished (or cancelled or failed) 
-                  build and idling Jenkins
---wait            Value passed to sleep in main loop
---cacert          Path to CA cert for OpenShift host
---insecure        Will use --insecure with curl in case you don't have 
-                  CA cert for OpenShift host
+-h                        Print help
+-H|--host                 Openshift host URI
+-t|--token                OpenShift token for auth
+-n|--jenkins-namespace    OpenShift namespace to operate in
+-b|--build-namespace      OpenShift namespace to operate in
+--idle-after              Time to wait between finished (or cancelled or failed) 
+                          build and idling Jenkins
+--wait                    Value passed to sleep in main loop
+--cacert                  Path to CA cert for OpenShift host
+--insecure                Will use --insecure with curl in case you don't have 
+                          CA cert for OpenShift host
   "  
 
 }
@@ -56,9 +56,13 @@ while [ -n "$1" ]; do
         shift
         TOKEN=$1
         ;;
-    -n|--namespace)
+    -n|--jenkins-namespace)
         shift
         NAMESPACE=$1
+        ;;
+    -b|--build-namespace)
+        shift
+        BUILD_NAMESPACE=$1
         ;;
     *) echo "Unknown parameter $1"
        exit 1
@@ -70,6 +74,8 @@ done
 RAW_HOST=$(echo ${HOST} | sed -n 's#\([^:]*\).*#\1#p') #FIXME
 [[ "${HOST}" =~ ^http:// ]] || HOST="https://"${HOST}
 [[ "${HOST}" =~ /$ ]] || HOST=${HOST}"/"
+
+[ -n "${BUILD_NAMESPACE}" ] || BUILD_NAMESPACE=${NAMESPACE}
 
 
 function waker() {
@@ -138,10 +144,18 @@ function sleeper() {
 
 }
 
+RETRY=1
 while true; do
 
   #echo curl -k -H "Authorization: Bearer ${TOKEN}" "${HOST}oapi/v1/namespaces/${NAMESPACE}/builds"
-  RESPONSE=$(curl ${CACERT} -k -H "Authorization: Bearer ${TOKEN}" "${HOST}oapi/v1/namespaces/${NAMESPACE}/builds" 2> /dev/null)
+  RESPONSE=$(curl ${CACERT} -k -H "Authorization: Bearer ${TOKEN}" "${HOST}oapi/v1/namespaces/${BUILD_NAMESPACE}/builds" 2> /dev/null)
+  if [ $? -ne 0 ]; then
+    echo "Could not get builds from namespace ${BUILD_NAMESPACE} (${RETRY})"
+    if [ ${RETRY} -ge 5 ]; then
+      exit 1
+    fi
+    RETRY=$(( ${RETRY} + 1 ))
+  fi
   PHASE=""
   TYPE=""
   TIMESTAMP=""

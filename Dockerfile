@@ -1,4 +1,4 @@
-FROM centos
+FROM centos:7
 MAINTAINER Vašek Pavlín <vasek@redhat.com>
 
 RUN yum -y install epel-release &&\
@@ -12,6 +12,9 @@ RUN mkdir -p /opt/jenkins-dreamer &&\
     find /opt/jenkins-dreamer -type d -exec chmod g+x {} +
 
 WORKDIR /opt/jenkins-dreamer
+ADD health_check.sh /opt/jenkins-dreamer/
+RUN chmod +x /opt/jenkins-dreamer/health_check.sh
+
 ADD dreamer.sh /opt/jenkins-dreamer/
 RUN chmod +x /opt/jenkins-dreamer/dreamer.sh
 

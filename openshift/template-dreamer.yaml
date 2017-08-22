@@ -31,7 +31,7 @@ objects:
       spec:
         containers:
           - name: jenkins-dreamer
-            image: vpavlin/dreamer
+            image: ${IMAGE}:${IMAGE_TAG}
             resources: {}
             terminationMessagePath: /dev/termination-log
             imagePullPolicy: Always
@@ -39,17 +39,38 @@ objects:
               capabilities: {}
               privileged: false
             env:
-              - name: DREAMER_NAMESPACE
+              - name: NAMESPACE
                 valueFrom:
                   fieldRef:
                     fieldPath: metadata.namespace
               - name: IDLE_AFTER
-                value: "1"
+                value: "10"
               - name: WAIT_TIME
-                value: "2"
+                value: "5"
+            livenessProbe:
+              exec:
+                command: ["/opt/jenkins-dreamer/health_check.sh"]
+              initialDelaySeconds: 5
+              periodSeconds: 15
+              timeoutSeconds: 1
+            readinessProbe:
+              exec:
+                command: ["/opt/jenkins-dreamer/health_check.sh"]
+              initialDelaySeconds: 10
+              timeoutSeconds: 1
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "250m"
+              limits:
+                memory: "256Mi"
+                cpu: "500m"
         restartPolicy: Always
         terminationGracePeriodSeconds: 30
         dnsPolicy: ClusterFirst
         securityContext: {}
-
-
+parameters:
+- name: IMAGE
+  value: vpavlin/dreamer
+- name: IMAGE_TAG
+  value: latest
