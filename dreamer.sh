@@ -183,6 +183,8 @@ while true; do
   TYPE=""
   TIMESTAMP=""
   NAME=""
+  #Reorder - latest build will be last
+  RESPONSE=$(echo ${RESPONSE} | jq '.items|=sort_by(.metadata.annotations."openshift.io/build.number" | tonumber)')
   i=-1
   while [ "${TYPE}" != "JenkinsPipeline" ]; do
     len=$(echo $RESPONSE | jq -r '.items | length')

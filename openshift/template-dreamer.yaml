@@ -70,7 +70,7 @@ objects:
                 name: jenkins-token-c929p
                 readOnly: true
         restartPolicy: Always
-        terminationGracePeriodSeconds: 30
+        terminationGracePeriodSeconds: 29
         dnsPolicy: ClusterFirst
         securityContext: {}
         volumes:
