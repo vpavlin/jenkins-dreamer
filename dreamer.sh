@@ -169,7 +169,7 @@ while true; do
     fi
     PHASE=$(echo $RESPONSE | jq -r .items[$i].status.phase)
     TYPE=$(echo $RESPONSE | jq -r .items[$i].spec.strategy.type)
-    if [ "${PHASE}" == "Finished" -o "${PHASE}" == "Completed" -o "${PHASE}" == "Failed" -o "${PHASE}" == "Cancelled" ]; then
+    if [ "${PHASE}" == "Finished" -o "${PHASE}" == "Complete" -o "${PHASE}" == "Failed" -o "${PHASE}" == "Cancelled" ]; then
       TIMESTAMP=$(echo ${RESPONSE} | jq -r .items[$i].status.completionTimestamp)
     else
       TIMESTAMP=$(echo ${RESPONSE} | jq -r .items[$i].status.startTimestamp)
