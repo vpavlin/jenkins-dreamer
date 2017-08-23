@@ -65,10 +65,19 @@ objects:
               limits:
                 memory: "256Mi"
                 cpu: "500m"
+            volumeMounts:
+              - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+                name: jenkins-token-c929p
+                readOnly: true
         restartPolicy: Always
         terminationGracePeriodSeconds: 30
         dnsPolicy: ClusterFirst
         securityContext: {}
+        volumes:
+        - name: jenkins-token-c929p
+          secret:
+            defaultMode: 420
+            secretName: jenkins-token-c929p
 parameters:
 - name: IMAGE
   value: vpavlin/dreamer
