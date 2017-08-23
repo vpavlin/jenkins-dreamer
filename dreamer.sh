@@ -77,6 +77,11 @@ RAW_HOST=$(echo ${HOST} | sed -n 's#\([^:]*\).*#\1#p') #FIXME
 
 [ -n "${BUILD_NAMESPACE}" ] || BUILD_NAMESPACE=${NAMESPACE}
 
+function last_state_change() {
+  local LAST_STATE_TIME=$(date -u -I'seconds')
+  LAST_STATE_TIME=${LAST_STATE_TIME%%+*}Z
+  echo ${LAST_STATE_TIME}
+}
 
 function waker() {
   local RESPONSE=$1
@@ -98,9 +103,14 @@ function waker() {
 function sleeper() {
   local TIMESTAMP=$1
   local PHASE=$2
-  local LAST_BUILD_FILE=./lastBuild-${NAMESPACE}.txt
+  local LAST_BUILD_FILE=./lastBuild-${NAMESPACE}.txt #Information about last build
+  local LAST_STATE_FILE=./lastState-${NAMESPACE}.txt #Information about changes of jenkins state
+
   local LAST_BUILD_CNT=$(cat $LAST_BUILD_FILE || echo   "0")
   local LAST_BUILD=$(date -u -d "${LAST_BUILD_CNT}" +%s)
+  local LAST_STATE_DATA=$(cat ${LAST_STATE_FILE} || echo "idled 0" )
+  local LAST_STATE=${LAST_STATE_DATA%% *}
+  local LAST_STATE_TIME=${LAST_STATE_DATA##* }
   
   [ "${TIMESTAMP}" == "null" ] && TIMESTAMP=$(date -u -I'seconds') && TIMESTAMP=${TIMESTAMP%%+*}Z
 
@@ -111,15 +121,26 @@ function sleeper() {
   fi
 
   CURRENT_TS=$(date -u +%s)
-  TS_IDLE_AFTER=$(date -u -d "$TIMESTAMP + $IDLE_AFTER" +%s)
+  TS_IDLE_AFTER=$(date -u -d "${TIMESTAMP} + ${IDLE_AFTER}" +%s)
+  LAST_TS_IDLE_AFTER=$(date -u -d "${LAST_STATE_TIME} + ${IDLE_AFTER}" +%s)
 
-  if [ "$CURRENT_TS" -ge "$TS_IDLE_AFTER" ] && [ "${PHASE}" == "Finished" -o "${PHASE}" == "Complete" -o "${PHASE}" == "Failed" -o "${PHASE}" == "Cancelled" ]; then
+  #echo "DIFF=$(( ${CURRENT_TS} - ${TS_IDLE_AFTER} )) LAST_TS_IDLE_AFTER=${LAST_TS_IDLE_AFTER} LAST_STATE_DATA=${LAST_STATE_DATA}"
+
+  if [ "${CURRENT_TS}" -ge "${TS_IDLE_AFTER}" ] && [ "${PHASE}" == "Finished" -o "${PHASE}" == "Complete" -o "${PHASE}" == "Failed" -o "${PHASE}" == "Cancelled" ]; then
     #Check current replicas
     if $DEBUG; then
       echo "curl ${CACERT} -XGET -k -H "Authorization: Bearer ${TOKEN}" ${HOST}oapi/v1/namespaces/${NAMESPACE}/deploymentconfigs/jenkins/"
     fi
     REPLICAS=$(curl ${CACERT} -XGET -k -H "Authorization: Bearer ${TOKEN}" ${HOST}oapi/v1/namespaces/${NAMESPACE}/deploymentconfigs/jenkins/ 2> /dev/null | jq -r '.spec.replicas')
     if [ "${REPLICAS}" -gt 0 ]; then
+      if [ "${LAST_STATE}" == "idled" ]; then
+        echo "Jenkins has been waken up by user, will let it run for ${IDLE_AFTER}"
+        echo "running "$(last_state_change) > ${LAST_STATE_FILE}
+        return
+      elif [ "${LAST_TS_IDLE_AFTER}" -ge "${CURRENT_TS}" ]; then
+        echo "Jenkins has been waken by user, will be idled in "$(( ${LAST_TS_IDLE_AFTER} - ${CURRENT_TS} ))"s"
+        return
+      fi
       #echo "Jenkins already idled"
       echo "Idling Jenkins. Good night."
       IDLED_AT=$(date -u -I'seconds')
@@ -137,6 +158,8 @@ function sleeper() {
       #Put new DC
       curl ${CACERT} -q -k -XPUT  -H "Accept: application/json, */*" -H "Content-Type: application/json" -H "User-Agent: oc/v1.4.1+3f9807a (linux/amd64) openshift/92ef595" -d @dc-patched.json\
       -H "Authorization: Bearer ${TOKEN}" ${HOST}oapi/v1/namespaces/${NAMESPACE}/deploymentconfigs/jenkins &> /dev/null
+      
+      echo "idled "$(last_state_change) > ${LAST_STATE_FILE}
     else
       return
     fi
