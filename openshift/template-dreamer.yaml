@@ -7,6 +7,8 @@ objects:
   kind: DeploymentConfig
   metadata:
     name: jenkins-dreamer
+    labels:
+      service: jenkins-dreamer
   spec:
     strategy:
       type: Rolling
@@ -28,6 +30,7 @@ objects:
         creationTimestamp: null
         labels:
           deploymentconfig: jenkins-dreamer
+          service: jenkins-dreamer
       spec:
         containers:
           - name: jenkins-dreamer
@@ -44,9 +47,11 @@ objects:
                   fieldRef:
                     fieldPath: metadata.namespace
               - name: IDLE_AFTER
-                value: "10"
+                value: "1"
               - name: WAIT_TIME
                 value: "5"
+              - name: NGINX_STATUS_UUID
+                value: "e93b3be4-5512-4894-afe0-fea40f28115b"
             livenessProbe:
               exec:
                 command: ["/opt/jenkins-dreamer/health_check.sh"]
@@ -78,6 +83,42 @@ objects:
           secret:
             defaultMode: 420
             secretName: jenkins-token-c929p
+- apiVersion: v1
+  kind: Service
+  metadata:
+    creationTimestamp: null
+    labels:
+      service: jenkins-dreamer
+    name: jenkins-dreamer
+  spec:
+    ports:
+    - name: "8080"
+      port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      service: jenkins-dreamer
+    sessionAffinity: None
+    type: ClusterIP
+  status:
+    loadBalancer: {}
+- apiVersion: v1
+  kind: Route
+  metadata:
+    creationTimestamp: null
+    labels:
+      service: jenkins-dreamer
+    name: jenkins
+  spec:
+    host: ''
+    port:
+      targetPort: "8080"
+    to:
+      kind: Service
+      name: jenkins-dreamer
+      weight: 100
+    wildcardPolicy: None
+  status: {}
 parameters:
 - name: IMAGE
   value: vpavlin/dreamer

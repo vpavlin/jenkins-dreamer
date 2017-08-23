@@ -77,10 +77,36 @@ RAW_HOST=$(echo ${HOST} | sed -n 's#\([^:]*\).*#\1#p') #FIXME
 
 [ -n "${BUILD_NAMESPACE}" ] || BUILD_NAMESPACE=${NAMESPACE}
 
+LAST_STATE_FILE=./lastState-${NAMESPACE}.txt #Information about changes of jenkins state
+
 function last_state_change() {
   local LAST_STATE_TIME=$(date -u -I'seconds')
   LAST_STATE_TIME=${LAST_STATE_TIME%%+*}Z
   echo ${LAST_STATE_TIME}
+}
+
+function sheep_counter() {
+  local URL=http://localhost:8080/${NGINX_STATUS_UUID}
+
+  local LAST_REQUESTS_FILE="./lastRequests-${NAMESPACE}.txt"
+  local LAST_REQUESTS=$(( $(cat ${LAST_REQUESTS_FILE} 2>/dev/null || echo "0") + 1 ))
+  local RESPONSE=$(curl ${URL} 2> /dev/null)
+  local ACTIVE=$(echo ${RESPONSE} | sed -n 's/Active connections: \([0-9]*\) .*/\1/p')
+  local REQUESTS=$(echo ${RESPONSE} | sed -n 's/.* requests [0-9]* [0-9]* \([0-9]*\) .*/\1/p')
+
+  if [ ${ACTIVE} -ge 2 ]; then
+    echo "USERS!!!"
+    echo "running "$(last_state_change) > ${LAST_STATE_FILE}
+    return
+  fi
+
+  if [ ${REQUESTS} -gt ${LAST_REQUESTS} ]; then
+    echo "USERS been here!!!"
+    echo "running "$(last_state_change) > ${LAST_STATE_FILE}
+  fi
+
+  echo ${REQUESTS} > ${LAST_REQUESTS_FILE}
+
 }
 
 function waker() {
@@ -104,7 +130,6 @@ function sleeper() {
   local TIMESTAMP=$1
   local PHASE=$2
   local LAST_BUILD_FILE=./lastBuild-${NAMESPACE}.txt #Information about last build
-  local LAST_STATE_FILE=./lastState-${NAMESPACE}.txt #Information about changes of jenkins state
 
   local LAST_BUILD_CNT=$(cat $LAST_BUILD_FILE || echo   "0")
   local LAST_BUILD=$(date -u -d "${LAST_BUILD_CNT}" +%s)
@@ -205,6 +230,8 @@ while true; do
   done
 
   echo "Last build of $TYPE was $PHASE since $TIMESTAMP"
+
+  sheep_counter
 
   if [ "${TYPE}" == "JenkinsPipeline" ]; then
     if [ "${PHASE}" == "New" ]; then
