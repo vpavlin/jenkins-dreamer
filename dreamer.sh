@@ -85,23 +85,32 @@ function last_state_change() {
   echo ${LAST_STATE_TIME}
 }
 
-function sheep_counter() {
-  local URL=http://localhost:8080/${NGINX_STATUS_UUID}
+function get_jenkins_replicas() {
+  curl ${CACERT} -XGET -k -H "Authorization: Bearer ${TOKEN}" ${HOST}oapi/v1/namespaces/${NAMESPACE}/deploymentconfigs/jenkins/ 2> /dev/null | jq -r '.spec.replicas'
+}
 
+function sheep_counter() {
+  local REPLICAS=$(get_jenkins_replicas)
+  if [ ${REPLICAS} -eq 0 ]; then
+    return
+  fi
+
+  local URL=http://${JENKINS_SERVICE_HOST}:${JENKINS_SERVICE_PORT_HTTP}/${NGINX_STATUS_UUID}
   local LAST_REQUESTS_FILE="./lastRequests-${NAMESPACE}.txt"
   local LAST_REQUESTS=$(( $(cat ${LAST_REQUESTS_FILE} 2>/dev/null || echo "0") + 1 ))
   local RESPONSE=$(curl ${URL} 2> /dev/null)
+  if [ -z "${RESPONSE}" ]; then
+    return
+  fi
   local ACTIVE=$(echo ${RESPONSE} | sed -n 's/Active connections: \([0-9]*\) .*/\1/p')
   local REQUESTS=$(echo ${RESPONSE} | sed -n 's/.* requests [0-9]* [0-9]* \([0-9]*\) .*/\1/p')
 
   if [ ${ACTIVE} -ge 2 ]; then
-    echo "USERS!!!"
     echo "running "$(last_state_change) > ${LAST_STATE_FILE}
     return
   fi
 
   if [ ${REQUESTS} -gt ${LAST_REQUESTS} ]; then
-    echo "USERS been here!!!"
     echo "running "$(last_state_change) > ${LAST_STATE_FILE}
   fi
 
@@ -131,9 +140,9 @@ function sleeper() {
   local PHASE=$2
   local LAST_BUILD_FILE=./lastBuild-${NAMESPACE}.txt #Information about last build
 
-  local LAST_BUILD_CNT=$(cat $LAST_BUILD_FILE || echo   "0")
+  local LAST_BUILD_CNT=$(cat $LAST_BUILD_FILE 2>/dev/null || echo   "0")
   local LAST_BUILD=$(date -u -d "${LAST_BUILD_CNT}" +%s)
-  local LAST_STATE_DATA=$(cat ${LAST_STATE_FILE} || echo "idled 0" )
+  local LAST_STATE_DATA=$(cat ${LAST_STATE_FILE} 2>/dev/null || echo "idled 0" )
   local LAST_STATE=${LAST_STATE_DATA%% *}
   local LAST_STATE_TIME=${LAST_STATE_DATA##* }
   
@@ -156,7 +165,7 @@ function sleeper() {
     if $DEBUG; then
       echo "curl ${CACERT} -XGET -k -H "Authorization: Bearer ${TOKEN}" ${HOST}oapi/v1/namespaces/${NAMESPACE}/deploymentconfigs/jenkins/"
     fi
-    REPLICAS=$(curl ${CACERT} -XGET -k -H "Authorization: Bearer ${TOKEN}" ${HOST}oapi/v1/namespaces/${NAMESPACE}/deploymentconfigs/jenkins/ 2> /dev/null | jq -r '.spec.replicas')
+    REPLICAS=$(get_jenkins_replicas)
     if [ "${REPLICAS}" -gt 0 ]; then
       if [ "${LAST_STATE}" == "idled" ]; then
         echo "Jenkins has been waken up by user, will let it run for ${IDLE_AFTER}"
@@ -186,6 +195,9 @@ function sleeper() {
       
       echo "idled "$(last_state_change) > ${LAST_STATE_FILE}
     else
+      if [ $(( ${TS_IDLE_AFTER} - ${CURRENT_TS} )) -ge 0 ]; then
+        echo "Jenkins will be idled in "$(( ${TS_IDLE_AFTER} - ${CURRENT_TS} ))"s"
+      fi
       return
     fi
   fi

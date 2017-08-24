@@ -83,42 +83,6 @@ objects:
           secret:
             defaultMode: 420
             secretName: jenkins-token-c929p
-- apiVersion: v1
-  kind: Service
-  metadata:
-    creationTimestamp: null
-    labels:
-      service: jenkins-dreamer
-    name: jenkins-dreamer
-  spec:
-    ports:
-    - name: "8080"
-      port: 8080
-      protocol: TCP
-      targetPort: 8080
-    selector:
-      service: jenkins-dreamer
-    sessionAffinity: None
-    type: ClusterIP
-  status:
-    loadBalancer: {}
-- apiVersion: v1
-  kind: Route
-  metadata:
-    creationTimestamp: null
-    labels:
-      service: jenkins-dreamer
-    name: jenkins
-  spec:
-    host: ''
-    port:
-      targetPort: "8080"
-    to:
-      kind: Service
-      name: jenkins-dreamer
-      weight: 100
-    wildcardPolicy: None
-  status: {}
 parameters:
 - name: IMAGE
   value: vpavlin/dreamer
