@@ -47,7 +47,7 @@ objects:
                   fieldRef:
                     fieldPath: metadata.namespace
               - name: IDLE_AFTER
-                value: "1"
+                value: "2"
               - name: WAIT_TIME
                 value: "5"
               - name: NGINX_STATUS_UUID
@@ -55,13 +55,13 @@ objects:
             livenessProbe:
               exec:
                 command: ["/opt/jenkins-dreamer/health_check.sh"]
-              initialDelaySeconds: 5
+              initialDelaySeconds: 10
               periodSeconds: 15
               timeoutSeconds: 1
             readinessProbe:
               exec:
                 command: ["/opt/jenkins-dreamer/health_check.sh"]
-              initialDelaySeconds: 10
+              initialDelaySeconds: 1
               timeoutSeconds: 1
             resources:
               requests:
